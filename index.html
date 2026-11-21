@@ -1,0 +1,228 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IronLog | Workout Tracker</title>
+<style>
+:root{--bg:#0b0e13;--panel:#141923;--panel2:#1b2330;--line:#293344;--muted:#96a2b4;--white:#f3f5f8;--green:#a3e635;--blue:#70a5ff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--white);font:15px system-ui,-apple-system,sans-serif}
+header{padding:22px 5%;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+.logo{font-size:23px;font-weight:850;letter-spacing:-1px}.logo span{color:var(--green)}
+small,.muted{color:var(--muted)}
+main{max-width:950px;margin:auto;padding:25px 18px 60px}
+h1{font-size:30px;margin:8px 0}h2{font-size:19px;margin:0 0 16px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:22px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:25px}
+.stat,.card{background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:17px}
+.stat b{font-size:26px;display:block;margin-top:8px}
+nav{display:flex;gap:8px;overflow:auto;margin-bottom:20px}
+nav button{background:var(--panel);border:1px solid var(--line);color:var(--muted);padding:11px 17px;border-radius:9px;white-space:nowrap}
+nav button.active{background:var(--green);color:#111;border-color:var(--green);font-weight:750}
+button{cursor:pointer;font:inherit}
+.btn{border:0;border-radius:9px;background:var(--green);color:#10140a;font-weight:750;padding:12px 17px}
+.btn.secondary{background:var(--panel2);color:var(--white);border:1px solid var(--line)}
+.btn.danger{background:#42232a;color:#ffb9c0}
+input,select{width:100%;background:#0e131c;color:var(--white);border:1px solid var(--line);padding:11px;border-radius:8px;font:inherit;min-width:0}
+label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+.field{margin-bottom:14px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.exercise{border:1px solid var(--line);background:#101620;border-radius:12px;padding:14px;margin:13px 0}
+.exercise-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px}
+.setrow{display:grid;grid-template-columns:35px 1fr 1fr 35px;gap:8px;align-items:center;margin:8px 0}
+.setrow span{text-align:center;color:var(--muted)}
+.setrow input{padding:9px}
+.sethead{display:grid;grid-template-columns:35px 1fr 1fr 35px;gap:8px;font-size:11px;color:var(--muted);text-align:center}
+.exercise-actions{display:flex;justify-content:space-between;margin-top:10px}
+.hidden{display:none!important}
+.history-item{border-bottom:1px solid var(--line);padding:15px 0}
+.history-item:last-child{border:0}
+.tag{font-size:11px;background:#263a24;color:var(--green);padding:5px 9px;border-radius:20px}
+canvas{width:100%;height:220px}
+#notice{color:var(--green);min-height:22px;margin-top:10px}
+footer{text-align:center;color:var(--muted);font-size:12px;margin-top:35px}
+@media(max-width:560px){.stats{grid-template-columns:repeat(3,1fr)}.stat{padding:11px}.stat b{font-size:20px}.grid2{grid-template-columns:1fr}main{padding:18px 13px}.top h1{font-size:25px}}
+</style>
+</head>
+<body>
+<header>
+ <div class="logo">IRON<span>LOG</span> <small style="font-size:11px">/ TRAINING JOURNAL</small></div>
+ <span class="tag">MY FITNESS</span>
+</header>
+<main>
+ <div class="top">
+  <div><small>YOUR PERSONAL TRAINING SPACE</small><h1>Let's get stronger.</h1><div class="muted" id="today"></div></div>
+  <button class="btn" onclick="showTab('log')">+ Log workout</button>
+ </div>
+ <div class="stats">
+  <div class="stat"><small>WORKOUTS</small><b id="total">0</b></div>
+  <div class="stat"><small>TOTAL SETS</small><b id="sets">0</b></div>
+  <div class="stat"><small>EXERCISES</small><b id="exercises">0</b></div>
+ </div>
+ <nav>
+  <button class="active" data-tab="dashboard" onclick="showTab('dashboard')">Dashboard</button>
+  <button data-tab="log" onclick="showTab('log')">Log workout</button>
+  <button data-tab="history" onclick="showTab('history')">History</button>
+  <button data-tab="progress" onclick="showTab('progress')">Progress</button>
+ </nav>
+
+ <section id="dashboard">
+  <div class="card">
+   <h2>Welcome back 💪</h2>
+   <p class="muted">Every rep counts. Keep showing up and getting stronger.</p>
+   <button class="btn" onclick="showTab('log')">Start a workout →</button>
+  </div>
+  <div class="card" style="margin-top:15px">
+   <h2>Recent workouts</h2>
+   <div id="recent" class="muted">No workouts logged yet. Your journey starts here!</div>
+  </div>
+ </section>
+
+ <section id="log" class="hidden">
+  <div class="card">
+   <h2>Log your workout</h2>
+   <div class="grid2">
+    <div class="field"><label>DATE</label><input type="date" id="date"></div>
+    <div class="field"><label>WORKOUT TYPE</label>
+     <select id="type">
+      <option>Push A</option><option>Pull A</option>
+      <option>Push B</option><option>Pull B</option>
+      <option>Custom workout</option>
+     </select>
+    </div>
+   </div>
+   <div id="exerciseList"></div>
+   <button class="btn secondary" onclick="addExercise()" style="width:100%;margin-top:8px">+ Add exercise</button>
+   <button class="btn" onclick="saveWorkout()" style="width:100%;margin-top:14px">Save workout ✓</button>
+   <div id="notice"></div>
+  </div>
+ </section>
+
+ <section id="history" class="hidden">
+  <div class="card"><h2>Workout history</h2><div id="historyList"></div>
+   <button class="btn secondary" onclick="exportCSV()">Download CSV backup ↓</button>
+  </div>
+ </section>
+
+ <section id="progress" class="hidden">
+  <div class="card">
+   <h2>Exercise progress</h2>
+   <div class="field"><label>CHOOSE EXERCISE</label><select id="progressExercise" onchange="renderProgress()"></select></div>
+   <canvas id="chart" width="800" height="300"></canvas>
+   <div id="progressInfo" class="muted"></div>
+  </div>
+ </section>
+ <footer>Your data is saved locally in this browser. Export regular backups to keep your records safe.</footer>
+</main>
+<script>
+const KEY='ironlog_workouts_v1';
+let workouts=[];
+try{workouts=JSON.parse(localStorage.getItem(KEY)||'[]')}catch(e){workouts=[]}
+const $=id=>document.getElementById(id);
+const today=new Date().toISOString().slice(0,10);
+$('today').textContent=new Date().toLocaleDateString(undefined,{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+$('date').value=today;
+
+function persist(){localStorage.setItem(KEY,JSON.stringify(workouts))}
+function showTab(tab){
+ document.querySelectorAll('main section').forEach(s=>s.classList.add('hidden'));
+ $(tab).classList.remove('hidden');
+ document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
+ if(tab==='history')renderHistory();
+ if(tab==='progress')renderProgress();
+ if(tab==='dashboard')renderDashboard();
+}
+let exCount=0;
+function addExercise(name='',sets=3){
+ const id=++exCount;
+ const div=document.createElement('div');
+ div.className='exercise';div.dataset.id=id;
+ div.innerHTML=`
+ <div class="exercise-head"><strong>Exercise</strong><button class="btn danger" onclick="this.closest('.exercise').remove()">Remove</button></div>
+ <div class="field"><label>EXERCISE NAME</label><input class="exname" placeholder="e.g. Dumbbell chest press" value="${escapeAttr(name)}"></div>
+ <div class="sethead"><span>SET</span><span>WEIGHT (KG)</span><span>REPS</span><span></span></div>
+ <div class="setlist"></div>
+ <div class="exercise-actions"><button class="btn secondary" onclick="addSet(this)">+ Add set</button><small class="muted">Enter each set separately</small></div>`;
+ $('exerciseList').appendChild(div);
+ for(let i=0;i<sets;i++)addSet(div.querySelector('.exercise-actions button'));
+}
+function escapeAttr(s){return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;')}
+function addSet(button,weight='',reps=''){
+ const list=button.closest('.exercise').querySelector('.setlist');
+ const n=list.children.length+1;
+ const row=document.createElement('div');row.className='setrow';
+ row.innerHTML=`<span>${n}</span><input type="number" min="0" step="0.25" placeholder="kg" value="${weight}" class="kg"><input type="number" min="1" step="1" placeholder="reps" value="${reps}" class="reps"><button class="btn danger" style="padding:7px" onclick="this.parentElement.remove();renumber(this.closest('.setlist'))">×</button>`;
+ list.appendChild(row);
+}
+function renumber(list){[...list.children].forEach((r,i)=>r.querySelector('span').textContent=i+1)}
+function saveWorkout(){
+ const date=$('date').value,type=$('type').value;
+ if(!date){$('notice').textContent='Please select a date.';return}
+ const exercises=[...document.querySelectorAll('.exercise')].map(card=>{
+  const name=card.querySelector('.exname').value.trim();
+  const sets=[...card.querySelectorAll('.setrow')].map(r=>({kg:Number(r.querySelector('.kg').value),reps:Number(r.querySelector('.reps').value)})).filter(s=>s.kg>=0&&s.reps>0&&rHasValue(s));
+  return {name,sets};
+ }).filter(e=>e.name&&e.sets.length);
+ if(!exercises.length){$('notice').textContent='Add an exercise with at least one completed set.';return}
+ workouts.push({id:Date.now(),date,type,exercises});
+ persist();$('notice').textContent='Workout saved successfully! 💪';
+ $('exerciseList').innerHTML='';addExercise();
+ renderDashboard();setTimeout(()=>showTab('dashboard'),700);
+}
+function rHasValue(s){return Number.isFinite(s.kg)&&Number.isFinite(s.reps)}
+function renderDashboard(){
+ $('total').textContent=workouts.length;
+ $('sets').textContent=workouts.reduce((n,w)=>n+w.exercises.reduce((a,e)=>a+e.sets.length,0),0);
+ $('exercises').textContent=workouts.reduce((n,w)=>n+w.exercises.length,0);
+ const recent=[...workouts].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,5);
+ $('recent').innerHTML=recent.length?recent.map(w=>`<div class="history-item"><b>${esc(w.type)}</b><div class="muted">${esc(w.date)} · ${w.exercises.length} exercises · ${w.exercises.reduce((n,e)=>n+e.sets.length,0)} sets</div></div>`).join(''):'No workouts logged yet. Your journey starts here!';
+}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function renderHistory(){
+ const sorted=[...workouts].sort((a,b)=>b.date.localeCompare(a.date));
+ $('historyList').innerHTML=sorted.length?sorted.map(w=>`
+ <div class="history-item">
+ <div style="display:flex;justify-content:space-between;gap:8px"><b>${esc(w.type)}</b><small>${esc(w.date)}</small></div>
+ ${w.exercises.map(e=>`<p style="margin:9px 0 3px"><b>${esc(e.name)}</b></p><small>${e.sets.map((s,i)=>`Set ${i+1}: ${s.kg} kg × ${s.reps}`).join(' · ')}</small>`).join('')}
+ <div style="margin-top:10px"><button class="btn danger" onclick="deleteWorkout(${w.id})">Delete workout</button></div>
+ </div>`).join(''):'<p class="muted">No workout history yet.</p>';
+}
+function deleteWorkout(id){if(confirm('Delete this workout?')){workouts=workouts.filter(w=>w.id!==id);persist();renderHistory();renderDashboard();renderProgress()}}
+function allNames(){return [...new Set(workouts.flatMap(w=>w.exercises.map(e=>e.name)))].sort()}
+function renderProgress(){
+ const names=allNames(),sel=$('progressExercise'),old=sel.value;
+ sel.innerHTML=names.length?names.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join(''):'<option value="">No exercises yet</option>';
+ if(names.includes(old))sel.value=old;
+ const name=sel.value;
+ const points=workouts.filter(w=>w.exercises.some(e=>e.name===name)).sort((a,b)=>a.date.localeCompare(b.date)).map(w=>{
+  const e=w.exercises.find(e=>e.name===name);
+  return {date:w.date,kg:Math.max(...e.sets.map(s=>s.kg))};
+ });
+ drawChart(points);
+ $('progressInfo').textContent=points.length?`Best recorded working weight: ${Math.max(...points.map(p=>p.kg))} kg · ${points.length} workouts recorded`:'Log workouts to see your progress here.';
+}
+function drawChart(points){
+ const c=$('chart'),ctx=c.getContext('2d'),W=c.width,H=c.height;
+ ctx.clearRect(0,0,W,H);ctx.strokeStyle='#293344';ctx.fillStyle='#96a2b4';ctx.font='13px system-ui';
+ for(let i=0;i<5;i++){let y=25+i*58;ctx.beginPath();ctx.moveTo(45,y);ctx.lineTo(W-15,y);ctx.stroke()}
+ if(!points.length){ctx.fillText('Your progress chart will appear here.',50,145);return}
+ const max=Math.max(...points.map(p=>p.kg),1)*1.15,min=Math.min(...points.map(p=>p.kg),0);
+ const range=max-min||1;
+ const coords=points.map((p,i)=>({x:55+(points.length===1?0:i*(W-100)/(points.length-1)),y:H-35-(p.kg-min)/range*(H-85)}));
+ ctx.strokeStyle='#a3e635';ctx.lineWidth=3;ctx.beginPath();
+ coords.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.stroke();
+ coords.forEach((p,i)=>{ctx.fillStyle='#a3e635';ctx.beginPath();ctx.arc(p.x,p.y,5,0,Math.PI*2);ctx.fill();ctx.fillStyle='#f3f5f8';ctx.fillText(points[i].kg+'kg',p.x-15,p.y-12)});
+ ctx.fillStyle='#96a2b4';ctx.fillText(points[0].date,45,H-8);if(points.length>1)ctx.fillText(points.at(-1).date,W-100,H-8);
+}
+function exportCSV(){
+ const rows=[['Date','Workout','Exercise','Set','Weight (kg)','Reps']];
+ workouts.forEach(w=>w.exercises.forEach(e=>e.sets.forEach((s,i)=>rows.push([w.date,w.type,e.name,i+1,s.kg,s.reps]))));
+ const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='ironlog-backup.csv';a.click();URL.revokeObjectURL(a.href);
+}
+addExercise();renderDashboard();
+</script>
+</body>
+</html>
