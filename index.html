@@ -91,6 +91,7 @@ canvas{width:100%;height:auto;max-height:300px}
 
   <section id="log" class="hidden">
     <div class="card">
+      <div id="logStatus" class="hint hidden"></div>
       <div class="grid2">
         <div><label for="date">Date</label><input type="date" id="date"></div>
         <div><label for="type">Workout</label>
@@ -98,7 +99,8 @@ canvas{width:100%;height:auto;max-height:300px}
       </div>
       <div id="exList"></div>
       <button class="btn alt full" id="addEx">Add exercise</button>
-      <button class="btn full" id="save">Save workout</button>
+      <button class="btn full" id="saveProg">Save progress</button>
+      <button class="btn alt full" id="save">Finish workout</button>
       <div id="msg"></div>
     </div>
   </section>
@@ -123,7 +125,7 @@ canvas{width:100%;height:auto;max-height:300px}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
 /* ===== 1. PASTE YOUR SUPABASE DETAILS HERE ===== */
-const SUPABASE_URL = 'https://mdztaladsmjwwzyxsktq.supabase.co/';
+const SUPABASE_URL = 'https://mdztaladsmjwwzyxsktq.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_619YsUk55xSMwh6OhPc5Cw_w2N1TNRX';
 
 /* ===== 2. YOUR TRAINING SETTINGS ===== */
@@ -142,6 +144,7 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const localDate = (d=new Date()) => new Date(d - d.getTimezoneOffset()*60000).toISOString().slice(0,10);
 let workouts = [];
+let currentId = null; // id of the workout being logged/edited (null = brand new)
 
 /* ---------- auth ---------- */
 async function login(){
@@ -179,9 +182,21 @@ document.querySelectorAll('nav button').forEach(b => b.onclick = () => showTab(b
 
 /* ---------- helpers ---------- */
 function flash(text, ok){ const m=$('msg'); m.textContent=text; m.className=ok?'ok':''; }
+const norm = s => String(s).trim().replace(/\s+/g,' ');
+const same = (a,b) => norm(a).toLowerCase()===norm(b).toLowerCase();
+function allNames(){ // one entry per exercise, whatever the day or capitalisation
+  const m = new Map();
+  workouts.forEach(w => w.exercises.forEach(e => { const k=norm(e.name).toLowerCase(); if(k && !m.has(k)) m.set(k, norm(e.name)); }));
+  return m;
+}
+function canon(name){ const n = norm(name); return allNames().get(n.toLowerCase()) || n; }
+function refreshNames(){
+  const set = new Set([...allNames().values(), ...Object.values(TEMPLATES).flat()]);
+  $('names').innerHTML = [...set].sort().map(n=>`<option value="${esc(n)}">`).join('');
+}
 function lastSets(name){
-  const n = name.trim().toLowerCase(); if(!n) return null;
-  for(const w of workouts){ const e = w.exercises.find(e => e.name.toLowerCase()===n); if(e) return e.sets; }
+  if(!norm(name)) return null;
+  for(const w of workouts){ if(w.id===currentId) continue; const e = w.exercises.find(e => same(e.name,name)); if(e) return e.sets; }
   return null;
 }
 function suggest(sets){
@@ -202,7 +217,7 @@ function loadTemplate(){
   $('exList').innerHTML = '';
   (TEMPLATES[$('type').value] || []).forEach(n => addExercise(n));
 }
-function addExercise(name=''){
+function addExercise(name='', sets=null){
   const div = document.createElement('div'); div.className='ex';
   div.innerHTML = `<div class="exhead"><input class="exname" list="names" placeholder="Exercise name" value="${esc(name)}"><button class="btn del" type="button">Remove</button></div>
   <div class="hint"></div>
@@ -212,9 +227,13 @@ function addExercise(name=''){
   $('exList').appendChild(div);
   const inp = div.querySelector('.exname');
   div.querySelector('.del').onclick = () => div.remove();
-  div.querySelector('.btn.alt').onclick = () => addSet(div);
-  inp.onchange = () => fillFromHistory(div);
-  fillFromHistory(div, true);
+  div.querySelector('.btn.alt').onclick = () => { const l=div.querySelector('.setrow:last-child .kg'); addSet(div, l?l.value:''); };
+  inp.onchange = () => {
+    inp.value = canon(inp.value);
+    if([...div.querySelectorAll('.reps')].some(r=>r.value)) return; // don't wipe sets already entered
+    fillFromHistory(div);
+  };
+  if(sets) sets.forEach(x => addSet(div, x.kg, x.reps)); else fillFromHistory(div, true);
 }
 function addSet(ex, kg='', reps='', hintReps=''){
   const list = ex.querySelector('.sets'), row = document.createElement('div'); row.className='setrow';
@@ -233,25 +252,53 @@ function fillFromHistory(ex, isNew){
     : `<b>Stay at ${s.top} kg</b> until every top set reaches ${REP_MAX} reps.`);
   last.forEach(x => addSet(ex, s.next, '', x.reps));
 }
-$('type').onchange = loadTemplate;
+$('type').onchange = () => { if(!currentId) loadTemplate(); };
 $('addEx').onclick = () => addExercise();
-$('startNext').onclick = () => { $('type').value = nextType(); loadTemplate(); showTab('log'); };
+$('startNext').onclick = () => { currentId = null; $('date').value = localDate(); $('type').value = nextType(); loadTemplate(); updateLogStatus(); showTab('log'); };
 
-$('save').onclick = async () => {
-  const exercises = [...document.querySelectorAll('.ex')].map(ex => ({
-    name: ex.querySelector('.exname').value.trim(),
+function collect(){
+  return [...document.querySelectorAll('.ex')].map(ex => ({
+    name: canon(ex.querySelector('.exname').value),
     sets: [...ex.querySelectorAll('.setrow')].map(r => ({kg:Number(r.querySelector('.kg').value), reps:Number(r.querySelector('.reps').value)}))
       .filter(s => Number.isFinite(s.kg) && s.reps>0)
   })).filter(e => e.name && e.sets.length);
+}
+function updateLogStatus(){
+  const s = $('logStatus');
+  if(!currentId){ s.classList.add('hidden'); s.innerHTML=''; return; }
+  s.classList.remove('hidden');
+  s.innerHTML = 'This workout is saved. Keep logging and press Save progress to update it. <button class="btn alt" id="newW" style="padding:5px 10px;margin-left:6px">Start a new workout</button>';
+  $('newW').onclick = () => { currentId=null; $('date').value=localDate(); loadTemplate(); updateLogStatus(); flash(''); };
+}
+async function persist(finish){
+  const exercises = collect();
   if(!$('date').value) return flash('Pick a date.');
-  if(!exercises.length) return flash('Add at least one exercise with a completed set.');
-  $('save').disabled = true;
-  const {data,error} = await sb.from('workouts').insert({date:$('date').value, type:$('type').value, exercises}).select().single();
-  $('save').disabled = false;
+  if(!exercises.length) return flash('Log at least one completed set first (weight and reps).');
+  $('save').disabled = $('saveProg').disabled = true;
+  const row = {date:$('date').value, type:$('type').value, exercises};
+  const q = currentId ? sb.from('workouts').update(row).eq('id', currentId) : sb.from('workouts').insert(row);
+  const {data,error} = await q.select().single();
+  $('save').disabled = $('saveProg').disabled = false;
   if(error) return flash('Save failed: '+error.message);
-  workouts.unshift(data); workouts.sort((a,b)=>b.date.localeCompare(a.date));
-  flash('Workout saved.', true); setNext(); loadTemplate(); setTimeout(()=>{flash('');showTab('dash')},600);
-};
+  currentId = data.id;
+  workouts = workouts.filter(w => w.id!==data.id); workouts.unshift(data); workouts.sort((a,b)=>b.date.localeCompare(a.date));
+  setNext(); renderDash();
+  if(finish){
+    currentId = null; updateLogStatus(); flash('Workout saved.', true);
+    setTimeout(()=>{ flash(''); $('date').value=localDate(); loadTemplate(); showTab('dash'); }, 600);
+  } else {
+    updateLogStatus(); flash('Progress saved at '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+'.', true);
+  }
+}
+$('saveProg').onclick = () => persist(false);
+$('save').onclick = () => persist(true);
+function editWorkout(id){
+  const w = workouts.find(x => String(x.id)===String(id)); if(!w) return;
+  currentId = w.id; $('date').value = w.date; $('type').value = w.type;
+  $('exList').innerHTML = '';
+  w.exercises.forEach(e => addExercise(e.name, e.sets));
+  flash(''); updateLogStatus(); showTab('log'); window.scrollTo(0,0);
+}
 
 /* ---------- views ---------- */
 const nSets = w => w.exercises.reduce((n,e)=>n+e.sets.length,0);
@@ -261,25 +308,25 @@ function renderDash(){
   $('total').textContent = workouts.length;
   $('sets').textContent = workouts.reduce((n,w)=>n+nSets(w),0);
   $('recent').innerHTML = workouts.slice(0,5).map(w => `<div class="item row"><b>${esc(w.type)}</b><span class="muted">${esc(w.date)}, ${w.exercises.length} exercises, ${nSets(w)} sets</span></div>`).join('') || '<p class="muted">No workouts yet. Log your first one.</p>';
-  const names = [...new Set(workouts.flatMap(w=>w.exercises.map(e=>e.name)))].sort();
-  $('names').innerHTML = names.map(n=>`<option value="${esc(n)}">`).join('');
+  refreshNames();
 }
 function renderHistory(){
   $('histList').innerHTML = workouts.map(w => `<div class="item"><div class="row"><b>${esc(w.type)}</b><small>${esc(w.date)}</small></div>
     ${w.exercises.map(e=>`<div style="margin-top:8px"><b>${esc(e.name)}</b><br><small>${e.sets.map(s=>`${s.kg} kg × ${s.reps}`).join(', ')}</small></div>`).join('')}
-    <button class="btn del" data-id="${w.id}" style="margin-top:8px;padding-left:0">Delete workout</button></div>`).join('') || '<p class="muted">Nothing here yet.</p>';
+    <div style="margin-top:10px;display:flex;gap:8px"><button class="btn alt ed" data-id="${w.id}" style="padding:7px 14px">Edit</button><button class="btn del" data-id="${w.id}">Delete</button></div></div>`).join('') || '<p class="muted">Nothing here yet.</p>';
+  document.querySelectorAll('#histList .ed').forEach(b => b.onclick = () => editWorkout(b.dataset.id));
   document.querySelectorAll('#histList .del').forEach(b => b.onclick = async () => {
     if(!confirm('Delete this workout?')) return;
     const {error} = await sb.from('workouts').delete().eq('id', b.dataset.id);
     if(error) return alert(error.message);
-    workouts = workouts.filter(w=>String(w.id)!==b.dataset.id); setNext(); renderHistory(); renderDash();
+    workouts = workouts.filter(w=>String(w.id)!==b.dataset.id); if(String(currentId)===b.dataset.id){currentId=null;updateLogStatus();} setNext(); renderHistory(); renderDash();
   });
 }
 function renderProgress(){
-  const names = [...new Set(workouts.flatMap(w=>w.exercises.map(e=>e.name)))].sort(), sel = $('pex'), old = sel.value;
+  const names = [...allNames().values()].sort(), sel = $('pex'), old = sel.value;
   sel.innerHTML = names.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('') || '<option>No exercises yet</option>';
   if(names.includes(old)) sel.value = old;
-  const pts = [...workouts].reverse().filter(w=>w.exercises.some(e=>e.name===sel.value)).map(w=>({date:w.date, kg:Math.max(...w.exercises.find(e=>e.name===sel.value).sets.map(s=>s.kg))}));
+  const pts = [...workouts].reverse().filter(w=>w.exercises.some(e=>same(e.name,sel.value))).map(w=>({date:w.date, kg:Math.max(...w.exercises.filter(e=>same(e.name,sel.value)).flatMap(e=>e.sets.map(s=>s.kg)))}));
   drawChart(pts);
   $('pinfo').textContent = pts.length ? `Best weight: ${Math.max(...pts.map(p=>p.kg))} kg across ${pts.length} sessions.` : '';
 }
