@@ -2,7 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14171c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="IronLog">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
 <title>IronLog</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
@@ -13,7 +21,7 @@ body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 Barlow,syste
 h1,h2,.num,.logo{font-family:'Barlow Condensed','Arial Narrow',sans-serif;letter-spacing:.2px}
 h1{font-size:40px;margin:0}h2{font-size:24px;margin:0 0 14px}
 .muted,small{color:var(--muted)}
-main{max-width:860px;margin:auto;padding:18px 16px 70px}
+main{max-width:860px;margin:auto;padding:calc(18px + env(safe-area-inset-top,0px)) 16px calc(70px + env(safe-area-inset-bottom,0px))}
 header{display:flex;justify-content:space-between;align-items:center;padding:6px 0 18px}
 .logo{font-size:30px;font-weight:700}.logo i{font-style:normal;color:var(--accent)}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:16px}
@@ -41,7 +49,7 @@ label{display:block;font-size:14px;color:var(--muted);margin-bottom:5px}
 .item{border-bottom:1px solid var(--line);padding:14px 0}.item:last-child{border:0}
 .row{display:flex;justify-content:space-between;gap:10px;align-items:center}
 .hidden{display:none!important}
-#login{max-width:340px;margin:12vh auto 0;padding:0 16px}
+#login{max-width:340px;margin:calc(10vh + env(safe-area-inset-top,0px)) auto 0;padding:0 16px}
 #msg,#loginMsg{min-height:22px;margin-top:10px;color:var(--bad)}#msg.ok{color:var(--accent)}
 canvas{width:100%;height:auto;max-height:300px}
 @media(max-width:560px){h1{font-size:32px}.num{font-size:32px}.grid2{grid-template-columns:1fr}}
